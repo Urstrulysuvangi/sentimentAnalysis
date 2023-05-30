@@ -1,38 +1,140 @@
-import requests
-from bs4 import BeautifulSoup
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from GoogleNews import GoogleNews
+from newspaper import Article
+from sumy.parsers.plaintext import PlaintextParser
+from sumy.nlp.tokenizers import Tokenizer
+from sumy.summarizers.lex_rank import LexRankSummarizer
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from textblob import TextBlob
-from flask import Flask, jsonify
+from pymongo import MongoClient
+
 
 app = Flask(__name__)
+CORS(app)
 
 
-@app.route('/reviews', methods=['GET'])
+@app.route('/myParagraphVader', methods=['POST'])
+def vader_analysis():
+    text = request.json['text']
+    analyzer = SentimentIntensityAnalyzer()
+    sentiment_scores = analyzer.polarity_scores(text)
+    return jsonify(sentiment_scores)
+
+
+@app.route('/myParagraphTextBlob', methods=['POST'])
+def textblob_analysis():
+    text = request.json['text']
+    blob = TextBlob(text)
+    sentiment = blob.sentiment.polarity
+
+    return jsonify({'sentiment': sentiment})
+
+
+# @app.route('/myParagraphAdvanced', methods=['POST'])
+# def advanced_analysis():
+#     text = request.json['text']
+
+
+@app.route('/newsSearch', methods=['POST'])
+def news_results():
+    search_term = request.json.get('searchTerm')
+    # Fetch news URLs using GoogleNews library
+    googlenews = GoogleNews(lang='en')
+    googlenews.search(search_term)
+    news_urls = googlenews.get_links()  # List of news URLs
+
+    # Establish connection to MongoDB
+    client = MongoClient('mongodb://localhost:27017')
+    db = client['articles']
+    collection = db[search_term]
+
+    # Retrieve articles, title, images, etc. using newspaper3k library
+    search_results = []
+    for url in news_urls:
+        article = Article(url)
+        article.download()
+        article.parse()
+        article.nlp()
+
+        # Extract relevant data from the article
+        parser = PlaintextParser.from_string(
+            article.text, Tokenizer("english"))
+        summarizer = LexRankSummarizer()
+        # Specify the number of sentences in the summary
+        summary = summarizer(parser.document, sentences_count=3)
+
+        # Perform sentiment analysis on the summary
+        sentiment_analyzer = SentimentIntensityAnalyzer()
+        summary_sentiment = sentiment_analyzer.polarity_scores(
+            ' '.join(str(sentence) for sentence in summary))
+
+        search_result = {
+            'title': article.title,
+            'url': url,
+            'text': article.text,
+            'summary': ' '.join(str(sentence) for sentence in summary),
+            'sentiment': summary_sentiment['compound'],
+            # Add more fields as needed
+        }
+
+        # Store the search_result in the collection named after the search_term
+        collection.insert_one(search_result)
+
+        search_results.append(search_result)
+
+    response = jsonify(search_results)
+    response.headers.add('Access-Control-Allow-Origin',
+                         'http://localhost:3000')
+    return response
+
+
+@app.route('/reviews', methods=['POST'])
 def reviews():
+    asin = request.json['asin']
+
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.chrome.options import Options
+    from selenium.common.exceptions import NoSuchElementException
+
     def scrape_reviews(asin):
+
+        # Set up the Selenium WebDriver with Chrome and Chrome options
+        # Replace with the actual path to chromedriver ON LOCAL STORAGE
+        chrome_driver_path = "/Users/jp/Desktop/chromedriver_mac64"
+        selenium_service = Service(chrome_driver_path)
+        driver = webdriver.Chrome(service=selenium_service)
+
+        # Website link and ASIN value
         base_url = "https://www.amazon.com"
         review_page_url = f"{base_url}/product-reviews/{asin}"
 
-        # Send a GET request to the review page
-        response = requests.get(review_page_url)
-        soup = BeautifulSoup(response.content, "html.parser")
+        # Open the review page in the browser
+        driver.get(review_page_url)
+
+        # Wait for the page to load
+        driver.implicitly_wait(5)
 
         # Create a list to store the scraped data
         scraped_data = []
 
         while True:
-            reviews = soup.select(".review")
+            reviews = driver.find_elements(By.CSS_SELECTOR, ".review")
 
             for review in reviews:
-                # Extract review data
-                review_title = review.select_one(".review-title").text.strip()
-                rating = review.select_one(".review-rating span").text.strip()
-                review_text = review.select_one(".review-text").text.strip()
+                review_title = review.find_element(
+                    By.CSS_SELECTOR, ".review-title").text
+                rating = review.find_element(
+                    By.CSS_SELECTOR, ".review-rating span").get_attribute("innerHTML")
+                review_text = review.find_element(
+                    By.CSS_SELECTOR, ".review-text").text
 
                 # Perform sentiment analysis using TextBlob
                 blob = TextBlob(review_text)
                 sentiment = blob.sentiment.polarity
 
-                # Determine sentiment label and emoji based on sentiment score
                 if sentiment > 0:
                     emoji = '😊'
                     sentiment_label = 'Positive'
@@ -43,34 +145,45 @@ def reviews():
                     emoji = '😐'
                     sentiment_label = 'Neutral'
 
-                # Create a dictionary for each review
+                # Perform summarization using Sumy's LexRankSummarizer
+                parser = PlaintextParser.from_string(
+                    review_text, Tokenizer("english"))
+                summarizer = LexRankSummarizer()
+                # Specify the number of sentences in the summary
+                summary = summarizer(parser.document, sentences_count=2)
+
+                # Convert summary sentences to a string
+                summary_text = " ".join(str(sentence) for sentence in summary)
+
+                # Create a dictionary for each review including the summary
                 review_data = {
                     "review_title": review_title,
                     "rating": rating,
                     "review_text": review_text,
+                    "summary": summary_text,
                     "emoji": emoji,
                     "polarity_score": sentiment,
                     "sentiment": sentiment_label
                 }
                 scraped_data.append(review_data)
 
-            # Check if there is a next page
-            next_button = soup.select_one(".a-last a")
-            if next_button:
-                next_page_url = base_url + next_button["href"]
-
-                # Send a GET request to the next page
-                response = requests.get(next_page_url)
-                soup = BeautifulSoup(response.content, "html.parser")
-            else:
+            try:
+                # Check if there is a next page
+                next_button = driver.find_element(By.CSS_SELECTOR, ".a-last a")
+                next_page_url = next_button.get_attribute("href")
+                driver.get(next_page_url)
+            except NoSuchElementException:
+                # If there is no next page, break the loop
                 break
+
+        # Close the browser
+        driver.quit()
 
         return scraped_data
 
-    asin = "B09G9FPHY6"
-    reviews_data = scrape_reviews(asin)
-    return jsonify(reviews_data)
+    reviews = scrape_reviews(asin)
+    return jsonify(reviews)
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)

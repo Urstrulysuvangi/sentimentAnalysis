@@ -1,10 +1,10 @@
 const Nav = () => {
   return (
-    <nav className="bg-gray-800">
+    <nav className="bg-primary font-poppins">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between py-4">
           <div>
-            <a href="/" className="text-white font-bold text-xl">
+            <a href="/" className="text-dimWhite font-bold text-xl">
               Home
             </a>
           </div>
@@ -13,18 +13,21 @@ const Nav = () => {
               <li>
                 <a
                   href="/myParagraph"
-                  className="text-white hover:text-gray-300"
+                  className="text-dimWhite hover:text-gray-300"
                 >
                   Analyze something
                 </a>
               </li>
               <li>
-                <a href="/news" className="text-white hover:text-gray-300">
+                <a href="/news" className="text-dimWhite hover:text-gray-300">
                   News
                 </a>
               </li>
               <li>
-                <a href="/reviews" className="text-white hover:text-gray-300">
+                <a
+                  href="/reviews"
+                  className="text-dimWhite hover:text-gray-300"
+                >
                   Reviews
                 </a>
               </li>

@@ -69,6 +69,9 @@ def news_results():
             'text': article.text,
             'summary': ' '.join(str(sentence) for sentence in summary),
             'sentiment': summary_sentiment['compound'],
+            'negative': summary_sentiment['neg'],
+            'positive': summary_sentiment['pos'],
+            'neutral': summary_sentiment['neu']
             # Add more fields as needed
         }
 

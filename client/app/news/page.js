@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import Link from "next/link";
 import Image from "next/image";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 const NewsResults = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -81,14 +82,52 @@ const NewsResults = () => {
               </div>
             )}
             {responseData.map((result, index) => (
-              <div key={index} className="border border-sky-600 p-4 m-4">
-                <h2 className="font-black">Title: {result.title}</h2>
-                <p>Summary: {result.summary}</p>
-                <p>Polarity Score: {result.sentiment}</p>
-                <Link href={result.url}>
-                  {" "}
-                  <span className="text-lime-600">Read More</span>{" "}
-                </Link>
+              <div key={index} className="border border-sky-600 p-4 m-4 flex">
+                <div className="flex-1">
+                  <Link href={result.url}>
+                    <h2>
+                      {" "}
+                      <span className="font-bold"> Title:</span>{" "}
+                      <span className="text-sky-700">{result.title}</span>
+                    </h2>
+                  </Link>
+                  <p className="text-justify">
+                    {" "}
+                    <span className="font-bold"> Summary: </span>{" "}
+                    {result.summary}
+                  </p>
+                  <p>
+                    {" "}
+                    <span className="font-bold">Polarity Score: </span>{" "}
+                    {result.sentiment}
+                  </p>
+                </div>
+                <div className="w-1/3">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: "Negative", value: result.negative },
+                          { name: "Neutral", value: result.neutral },
+                          { name: "Positive", value: result.positive },
+                        ]}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        label={({ name, percent }) =>
+                          `${name} ${(percent * 100).toFixed(0)}%`
+                        }
+                      >
+                        <Cell fill="#FF4136" />
+                        <Cell fill="#0074D9" />
+                        <Cell fill="#2ECC40" />
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             ))}
           </div>

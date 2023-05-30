@@ -39,7 +39,6 @@ function Page() {
       .then((response) => {
         // Handle the response from the backend
         setResponseData(response.data);
-        console.log(responseData);
       })
       .catch((error) => {
         // Handle error if any
