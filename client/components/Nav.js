@@ -11,8 +11,11 @@ const Nav = () => {
           <div>
             <ul className="flex space-x-4">
               <li>
-                <a href="/twitter" className="text-white hover:text-gray-300">
-                  Twitter
+                <a
+                  href="/myParagraph"
+                  className="text-white hover:text-gray-300"
+                >
+                  Analyze something
                 </a>
               </li>
               <li>

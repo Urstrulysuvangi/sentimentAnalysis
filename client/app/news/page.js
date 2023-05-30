@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import axios from "axios";
+import Link from "next/link";
 import Image from "next/image";
 
 const NewsResults = () => {
@@ -84,7 +85,10 @@ const NewsResults = () => {
                 <h2 className="font-black">Title: {result.title}</h2>
                 <p>Summary: {result.summary}</p>
                 <p>Polarity Score: {result.sentiment}</p>
-                <p>Read More: {result.url}</p>
+                <Link href={result.url}>
+                  {" "}
+                  <span className="text-lime-600">Read More</span>{" "}
+                </Link>
               </div>
             ))}
           </div>
